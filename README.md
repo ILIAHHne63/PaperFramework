@@ -14,5 +14,5 @@ conda activate aug_model
 pip install -r requirements.txt
 bash checkpoints.sh
 ```
-Также скачайте файл по данной сслыке: https://drive.google.com/file/d/1e83wWQh9Tsficx0HM2rmc2KyYfBMpumf/view, положите данный файл в AugmentationModel/AugModel/models/checkpoints/
+Также скачайте файл по данной ссылке: https://drive.google.com/file/d/1e83wWQh9Tsficx0HM2rmc2KyYfBMpumf/view, положите данный файл в AugmentationModel/AugModel/models/checkpoints/
 Далее используйте Example.ipynb
