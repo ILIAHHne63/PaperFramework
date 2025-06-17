@@ -5,10 +5,9 @@ from ultralytics import YOLO
 
 
 class YoloModel:
-
-    def __init__(self, model_path="yolo11n.pt"):
+    def __init__(self, model_path="yolo11n.pt", device="cuda"):
         """Инициализация модели YOLO для сегментации"""
-        self.model = YOLO(model_path)
+        self.model = YOLO(model_path).to(device)
 
     def __call__(self, image):
         """Обработка изображения и возврат маски самого большого объекта в формате PIL.Image
@@ -45,6 +44,5 @@ class YoloModel:
         mask[y1:y2, x1:x2] = 255
 
         mask_pil = Image.fromarray(mask)
-        mask_pil.save("/home/jovyan/nkiselev/istepanov/output.png")
-        print(class_name)
-        return mask_pil, class_name
+
+        return mask_pil, class_name, bbox.astype(int)

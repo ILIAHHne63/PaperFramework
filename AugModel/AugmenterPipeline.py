@@ -5,11 +5,10 @@ from PIL import Image
 from typing import List, Optional, Tuple
 from accelerate import Accelerator
 
-from .models import LLaMAModel
-from .models import LLaVAModel
 from .models import FluxModel
 from .models import YoloModel
 from .models import AlphaCLIPModel
+from .models import MultiModalModel
 
 
 class Augmenter:
@@ -28,18 +27,11 @@ class Augmenter:
         self.accelerator = Accelerator()
 
         self._models = {
-            "LLaMA": None,
-            "LLaVA": LLaVAModel(device=self.device),
             "Flux": FluxModel(device=self.device),
             "Yolo": YoloModel(),
             "AlphaCLIP": AlphaCLIPModel(device=self.device),
+            "MultiModal": MultiModalModel(device=self.device),
         }
-
-        llama_model = self._models["LLaVA"].model.language_model
-        llama_tokenizer = self._models["LLaVA"].processor.tokenizer
-        self._models["LLaMA"] = LLaMAModel(
-            model=llama_model, tokenizer=llama_tokenizer, device=self.device
-        )
 
     def _set_seed(self, seed: int) -> None:
         """
@@ -61,11 +53,10 @@ class Augmenter:
         Args:
         device (torch.device): The device on which the model will run.
         """
-        self._models["LLaMA"].to(device)
-        self._models["LLaVA"].to(device)
         self._models["Flux"].to(device)
         self._models["AlphaCLIP"].to(device)
         self._models["Yolo"].to(device)
+        self._models["MultiModal"].to(device)
         self.device = device
 
     def __call__(
@@ -75,6 +66,7 @@ class Augmenter:
         new_object: str = None,
         mask: Image.Image = None,
         prompt: str = None,
+        candidates: List[str] = None,
         alpha_clip_threshold: float = 0.2,
         ddim_steps: int = 50,
         guidance_scale: int = 5,
@@ -103,18 +95,25 @@ class Augmenter:
         if mask is None:
 
             if current_object is None:
-                mask, current_object = self._models["Yolo"](image)
+                mask, current_object, bbox = self._models["Yolo"](image)
 
             else:
-                mask, _ = self._models["Yolo"](image)
+                mask, _, bbox = self._models["Yolo"](image)
 
         if mask.mode != "L":
             mask = mask.convert("L")
 
         if prompt is None:
-            image_description = self._models["LLaVA"].generate_image_description(image)
-            prompt, new_object = self._models["LLaMA"].generate_prompt(
-                current_object, image_description, new_object
+            image_description = self._models["MultiModal"].generate_image_caption(
+                image, current_object
+            )
+            if candidates is None:
+                candidates = ["pizza", "apple", "cigarettes"]
+            new_object, image_description_filtred = self._models[
+                "MultiModal"
+            ].select_object(image_description, candidates, current_object)
+            prompt = self._models["MultiModal"].generate_expanded_prompt(
+                new_object, image_description_filtred
             )
 
         result = self._models["Flux"](
@@ -132,4 +131,4 @@ class Augmenter:
         if threshold < alpha_clip_threshold:
             print("This generation does not meet the specified threshold")
 
-        return result, prompt, threshold
+        return result, prompt, threshold, bbox

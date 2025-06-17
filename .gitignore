@@ -1,0 +1,3 @@
+AugModel/models/checkpoints
+AugModel/models/__pycache__
+yolo11n.pt
