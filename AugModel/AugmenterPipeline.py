@@ -13,8 +13,13 @@ from .models import MultiModalModel
 
 class Augmenter:
     """
-    A class that performs image augmentation by replacing objects in images.
+    A class for replacing objects in images using a pipeline of:
+    1. Object detection (YOLO)
+    2. Caption generation (MultiModalModel)
+    3. Object replacement (FluxModel)
+    4. Quality control (AlphaCLIP)
     """
+
 
     def __init__(self, device: str = "cuda"):
         """
@@ -62,31 +67,43 @@ class Augmenter:
     def __call__(
         self,
         image: Image.Image,
-        current_object: str = None,
-        new_object: str = None,
-        mask: Image.Image = None,
-        prompt: str = None,
-        candidates: List[str] = None,
+        current_object: Optional[str] = None,
+        new_object: Optional[str] = None,
+        mask: Optional[Image.Image] = None,
+        prompt: Optional[str] = None,
+        candidates: Optional[List[str]] = None,
         alpha_clip_threshold: float = 0.2,
         ddim_steps: int = 50,
         guidance_scale: int = 5,
         seed: int = 1,
     ) -> Tuple[Image.Image, Optional[Tuple[str, str]]]:
         """
-        Replaces the specified object in the given image with a new one.
-
+        Replaces an object in an image and returns the augmented image with metadata.
+        
+        Pipeline:
+        1. Detect object and get mask (if not provided)
+        2. Generate caption and replacement prompt
+        3. Perform inpainting with diffusion model
+        4. Verify result quality with AlphaCLIP
+        
         Args:
-        image (Image.Image): The input image.
-        mask (Image.Image): The mask of the object to replace.
-        current_object (str): The name of the object to be replaced.
-        new_objects_list (Optional[List[str]]): A list of potential new objects. If None, the method will generate a new object.
-        ddim_steps (int): The number of denoising steps. More steps mean a slower but potentially higher quality result.
-        guidance_scale (int): The scale for classifier-free guidance. Higher values lead to results that are more closely linked to the text prompt.
-        seed (int): Integer value that initializes the random number generator for reproducibility.
-        return_prompt (bool): If True, the method also returns the prompt used for generation and the new object.
-
+            image: Input PIL image (RGB recommended)
+            current_object: Object to replace (None for auto-detection)
+            new_object: Object to insert (None for auto-selection)
+            mask: Binary mask of object to replace (None for auto-detection)
+            prompt: Custom inpainting prompt (None for auto-generation)
+            candidates: Candidate objects for replacement
+            alpha_clip_threshold: Minimum AlphaCLIP score threshold
+            ddim_steps: Diffusion denoising steps
+            guidance_scale: Classifier-free guidance scale
+            seed: Random seed
+            
         Returns:
-        Tuple[Image.Image, Optional[Tuple[str, str]]]: The modified image and, optionally, the prompt used for generation and the new object.
+            augmented_image: Resulting PIL image
+            prompt_used: Final prompt used for inpainting
+            clip_score: AlphaCLIP quality score
+            bbox: Detected bounding box (xmin, ymin, xmax, ymax) or None
+            new_object_used: Object used for replacement
         """
         self._set_seed(seed)
         if image.mode != "RGB":
